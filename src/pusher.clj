@@ -1,5 +1,6 @@
 (ns pusher
  (:require
+   [clojure.string :as string]
    [clj-http.client :as http]
    [pusher.auth :as auth])
  (:use
@@ -20,8 +21,14 @@
   `(binding [*pusher-channel* ~channel]
      ~@body))
 
+(defn- channel-path
+  "Base path for anything channel related"
+  [& paths]
+  (let [last-path (if paths (str "/" (string/join "/" paths)))]
+    (str "/apps/" *pusher-app-id* "/channels/" *pusher-channel* last-path)))
+
 (defn- channel-events-path []
-  (str "/apps/" *pusher-app-id* "/channels/" *pusher-channel* "/events"))
+  (str (channel-path) "/events"))
 
 (defn- uri [path]
   (str pusher-api-host path))
@@ -34,3 +41,12 @@
                {:body (request :body)
                 :query-params (:query (auth/authenticated-request *pusher-key* *pusher-secret* request))
                 :headers {"Content-Type" "application/json"}})))
+
+(defn channel-status? []
+  (let [request (struct request "GET" (channel-path) {} "")
+        response (http/get (uri (:path request))
+                           {:query-params (:query (auth/authenticated-request *pusher-key* *pusher-secret* request))
+                            :headers {"Content-Type" "application/json"}
+                            :accept :json
+                            :as :json})]
+    response))
